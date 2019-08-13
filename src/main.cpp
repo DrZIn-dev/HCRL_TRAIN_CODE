@@ -1,5 +1,6 @@
-#include <Arduino.h> //? Main Arduino Lib Framework
-#include <WiFi.h>    //? Connect WiFi
+#include <Arduino.h>      //? Main Arduino Lib Framework
+#include <WiFi.h>         //? Connect WiFi
+#include <PubSubClient.h> //? Client MQTT
 
 //* Prototype Function
 void wifiSetup();
