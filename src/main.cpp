@@ -1,13 +1,15 @@
 #include <Arduino.h>      //? Main Arduino Lib Framework
 #include <WiFi.h>         //? Connect WiFi
 #include <PubSubClient.h> //? Client MQTT
+#include <ArduinoJson.h>
 
 //* Prototype Function
 void callback(char *topic, byte *payload, unsigned int length);
 void mqttReconnect();
 void mqttSetup();
-void wifiSetup();
 void mqttTestPub();
+void pubJSON();
+void wifiSetup();
 
 //* WIFI STA Details
 #define WiFi_STA_USERNAME "DrZin"       //? WiFi UserName
@@ -25,10 +27,12 @@ void mqttTestPub();
 unsigned long long previousMillis_WiFi = 0,
                    previousMillis_MQTT = 0,
                    previousMillis_PUB = 0;
-
+const char *title, *status;
+int duration;
 //* SUB Topic
-#define MQTT_SUB_TEST "/ESP32_1/Test" //? Test MQTT Only
-
+#define MQTT_SUB_TEST "/NODE_RED/Test" //? Test MQTT Only
+#define MQTT_SUB_JSON "/NODE_RED/JSON" //? JSON Format
+#define MQTT_PUB_JSON "/ESP32_1/JSON_PUB"
 WiFiClient client;         //? Create TCP Connection
 PubSubClient mqtt(client); //? Create Mqtt over WiFiClient
 
@@ -51,8 +55,8 @@ void loop()
   else
   {
     mqtt.loop();
+    pubJSON();
   }
-  mqttTestPub();
 }
 
 void wifiSetup()
@@ -96,6 +100,24 @@ void callback(char *topic, byte *payload, unsigned int length)
   payload[length] = '\0';
   String topic_str = topic, payload_str = (char *)payload;
   Serial.println("[" + topic_str + "]: " + payload_str);
+  if (topic_str == MQTT_SUB_JSON)
+  {
+    Serial.println("--- Start JSON Process ---");
+    const size_t capacity = JSON_OBJECT_SIZE(3); //? Object Size
+    DynamicJsonDocument doc(capacity);           //? Declare variable for store json
+
+    deserializeJson(doc, payload, length); //? deserialize JSON
+
+    title = doc["title"];       //? Store key title to tittle
+    duration = doc["duration"]; //? Store key duration to duration
+    status = doc["status"];     //? Store key status to status
+
+    Serial.println("title : " + String(title) + " | " +
+                   "durations : " + String(duration) + " | " +
+                   "status : " + String(status)); //?Print Output
+
+    Serial.println("--- END JSON Process ---");
+  }
 }
 void mqttReconnect()
 {
@@ -120,6 +142,8 @@ void mqttReconnect()
   {
     Serial.println("connected : " + String(MQTT_SUB_TEST));
     mqtt.subscribe(MQTT_SUB_TEST);
+    Serial.println("connected : " + String(MQTT_SUB_JSON));
+    mqtt.subscribe(MQTT_SUB_JSON);
   }
   else
   {
@@ -135,5 +159,25 @@ void mqttTestPub()
     previousMillis_PUB = currentMillis; //? Save Current time
 
     mqtt.publish(MQTT_SUB_TEST, "Hello From M5GO");
-    }
+  }
+}
+
+void pubJSON()
+{
+  unsigned long currentMillis = millis(); //? Store Current time
+  if (currentMillis - previousMillis_PUB > 500)
+  {
+    previousMillis_PUB = currentMillis; //? Save Current time
+    const size_t capacity = JSON_OBJECT_SIZE(3);
+    DynamicJsonDocument doc(capacity);
+    char buffer[512];
+
+    doc["title"] = "test1";
+    doc["duration"] = 10;
+    doc["status"] = "Todo";
+
+    serializeJson(doc, buffer);
+
+    mqtt.publish(MQTT_PUB_JSON, buffer);
+  }
 }
